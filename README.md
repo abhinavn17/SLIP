@@ -32,3 +32,8 @@ slip_config -c <config.ini name> <msfile>
 ```bash
 slip <config.ini>
 ```
+
+## Credits
+
+- **Dr. Narendranath Patra** - *Author*
+- **Abhinav Narayan** - *Author*
