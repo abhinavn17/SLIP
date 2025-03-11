@@ -169,7 +169,7 @@ cython_debug/
 *.ini
 *.pxd
 !def.ini
-!slip_paramters.ini
+!slip/slip_parameters.ini
 !config.ini
 .vscode
 include
