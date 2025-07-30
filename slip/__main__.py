@@ -2,7 +2,8 @@
 To image spectral cube.
 '''
 import os
-from casatasks import tclean, uvcontsub, imstat, exportfits
+from casatasks import tclean, uvcontsub, imstat, exportfits, uvsub
+from casatools import table
 import argparse
 import subprocess
 from configparser import ConfigParser
@@ -78,19 +79,50 @@ def main():
     echan_line = par['echan_line']
     spw = par['spw']
     fitorder = int(par['fit_order'])
+    uvsub_flag = par['do_uvsub']
+    uvcontsub_flag = par['do_uvcontsub']
+
+    if uvsub_flag.lower() == 'true':
+        uvsub_flag = True
+    else:
+        uvsub_flag = False
+
+    if uvcontsub_flag.lower() == 'true':
+        uvcontsub_flag = True
+    else:
+        uvcontsub_flag = False
 
     # Performing uvsub
     msfile = par['msfile']
-    # name = msfile.split('.ms')[0]
-    ms_uvsub = msfile.split('.ms')[0] + '_uvcontsub.ms'
-    contchans = str(spw) + ':' + str(bchan) + '~' + str(bchan_line) + ';' + str(echan_line) + '~' + str(echan)
+    datacolumn = 'data'
+    ms_uvsub = msfile
+    if uvsub_flag:
+        t = table(msfile, readonly=False)
+        uvsub_done = t.getkeywords().get("UVSUB_DONE", False)
 
-    if not(os.path.exists(ms_uvsub)):
-        print("Running UVCONTSUB")
-        uvcontsub(vis=msfile, outputvis=ms_uvsub, spw = str(spw), datacolumn = 'data', fitspec=contchans, fitorder=fitorder, field='0')
-    else:
-        print('UVCONTSUB file exist. Not doing uvcontsub.')
-    # ------------------------------
+        if uvsub_done:
+            print('UVSUB already done. Not doing uvsub again.')
+        else:
+            print('Running UVSUB')
+            uvsub(vis=msfile)
+            t.putkeyword('UVSUB_DONE', True)
+
+        t.close()
+        datacolumn = 'corrected_data'
+
+    if uvcontsub_flag:
+        ms_uvsub = msfile.split('.ms')[0] + '_uvcontsub.ms'
+        contchans = str(spw) + ':' + str(bchan) + '~' + str(bchan_line) + ';' + str(echan_line) + '~' + str(echan)
+        datacolumn = 'data'
+
+        if not(os.path.exists(ms_uvsub)):
+            print("Running UVCONTSUB")
+            
+            uvcontsub(vis=msfile, outputvis=ms_uvsub, spw = str(spw), datacolumn = datacolumn, fitspec=contchans, fitorder=fitorder, field='0')
+            datacolumn = 'data'
+        else:
+            print('UVCONTSUB file exist. Not doing uvcontsub.')
+        # ------------------------------
 
     # Performing line imaging
     uvrange = par['uvrange']
@@ -110,8 +142,14 @@ def main():
     width = par['width']
     spw_cube = str(spw) + ':' + str(bchan) + '~' + str(echan)
     tcell = str(cell) + 'arcsec'
-    tuvrange = '0~' + str(uvrange) + 'klambda'
-    tuvtaper = str(uvtaper) + 'klambda'
+    if int(uvrange) > 0:
+        tuvrange = '0~' + str(uvrange) + 'klambda'
+    else:
+        tuvrange = ''
+    if int(uvtaper) > 0:
+        tuvtaper = str(uvtaper) + 'klambda'
+    else:
+        tuvtaper = ''
     # timsize = '[' + str(imsize) + ',' + str(imsize) + ']'
     tmask = 'circle[' + str(maskcx) + 'pix,' + str(maskcy) + 'pix],' + str(maskrad) + 'pix]'
     twidth = str(width) + 'km/s'
@@ -140,11 +178,11 @@ def main():
 
         os.environ['OMP_NUM_THREADS'] = '1'
 
-        command = ['mpirun', '-nq', f'{nproc}', 'python', '-m', 'slip.imager', ms_uvsub, out_tclean, field, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width]
+        command = ['mpirun', '-nq', f'{nproc}', 'python', '-m', 'slip.imager', ms_uvsub, out_tclean, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width]
     
     else:
 
-        command = ['python', '-m', 'slip.imager', ms_uvsub, out_tclean, field, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width]
+        command = ['python', '-m', 'slip.imager', ms_uvsub, out_tclean, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width]
 
     subprocess.run(command)
 
@@ -152,7 +190,7 @@ def main():
     tname = out_tclean + '.image'
     noise_stat = imstat(imagename=tname, chans='20')
     rms = noise_stat['rms'][0]
-    noise_stats = imstat(imagename=tname)
+    # noise_stats = imstat(imagename=tname)
     peak = noise_stat['max'][0]
     snr = peak/rms
     print('+++++++++++++++++++++++++')
