@@ -65,7 +65,7 @@ def read_parameters(file_path):
     return parameters
 # ------------------------------
 
-def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width, deconvolver, usemask, mask, nproc):
+def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width, deconvolver, usemask, mask, nproc, nmajor):
 
     cmd = 'rm -rf ' + out_tclean + '*'
     os.system(cmd)
@@ -98,17 +98,18 @@ def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, velt
     print(f"  Deconvolver: {deconvolver}")
     print(f"  Usemask: {usemask}")
     print(f"  Mask: {mask}")
+    print(f"  Nmajor: {nmajor}")
     print(f"  Nproc: {nproc}")
 
     if parallel:
 
         os.environ['OMP_NUM_THREADS'] = '1'
 
-        command = ['mpirun', '-nq', f'{nproc}', 'python', '-m', 'slip.imager', ms_uvsub, out_tclean, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width, deconvolver, usemask, mask]
+        command = ['mpirun', '-nq', f'{nproc}', 'python', '-m', 'slip.imager', ms_uvsub, out_tclean, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width, deconvolver, usemask, mask, str(nmajor)]
     
     else:
 
-        command = ['python', '-m', 'slip.imager', ms_uvsub, out_tclean, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width, deconvolver, usemask, mask]
+        command = ['python', '-m', 'slip.imager', ms_uvsub, out_tclean, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width, deconvolver, usemask, mask, str(nmajor)]
 
     subprocess.run(command)
 
@@ -122,6 +123,7 @@ def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, velt
     print('+++++++++++++++++++++++++')
     print('+++++++++++++++++++++++++')
     print('+++++++++++++++++++++++++')
+    print(f'For cube {out_tclean}')
     print('RMS = %4.1f mJy'%(rms*1e3))
     print('Max SNR is %4.1f'%snr)
     print('+++++++++++++++++++++++++')
@@ -281,10 +283,8 @@ def main():
     nproc = par['nproc']
 
     out_tclean = name + '_cube_0'
-    usemask = 'auto-multithresh'
-    mask = ''
 
-    run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = niter, cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = deconvolver, usemask = usemask, mask = mask, nproc = nproc)
+    run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = '1000', cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = 'hogbom', usemask = 'pb', mask = '', nproc = nproc, nmajor = 0)
 
     sofia_niter = int(par['sofia_niter'])
     sofia_thresh = par['thresh']
@@ -301,7 +301,7 @@ def main():
 
         out_tclean = name + '_cube_' + str(i+1)
 
-        run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = niter, cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = deconvolver, usemask = 'user', mask = casa_mask, nproc = nproc)
+        run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = niter, cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = deconvolver, usemask = 'user', mask = casa_mask, nproc = nproc, nmajor= -1)
 
     # os.system('rm -rf test_sofia/')
     # os.system('mkdir test_sofia')
