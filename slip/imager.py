@@ -21,4 +21,9 @@ if __name__ == '__main__':
     robust = float(robust)
     nmajor = int(nmajor)
 
-    tclean(vis=ms_uvsub, imagename=out_tclean, field=field, spw=spw_cube, datacolumn=datacolumn, specmode='cube', outframe=outframe,  veltype=veltype,restfreq=restfreq, cell=tcell, uvrange=tuvrange, uvtaper=tuvtaper, deconvolver=deconvolver, imsize=timsize, weighting=weighting, niter=niter, cycleniter=cycleniter, interactive=False, parallel=True, usemask=usemask, mask= mask, robust=robust, restoringbeam='common', width=width, savemodel='none', nmajor=nmajor, nsigma=nsigma)
+    try:
+        width = int(width)
+    except ValueError:
+        width = str(width)
+
+    tclean(vis=ms_uvsub, imagename=out_tclean, field=field, spw=spw_cube, datacolumn=datacolumn, specmode='cube', outframe=outframe,  veltype=veltype,restfreq=restfreq, cell=tcell, uvrange=tuvrange, uvtaper=tuvtaper, deconvolver=deconvolver, imsize=timsize, weighting=weighting, scales = [0, 12, 24, 49, 98 ,195], niter=niter, cycleniter=cycleniter, interactive=False, parallel=True, usemask=usemask, mask= mask, robust=robust, restoringbeam='common', width=width, savemodel='none', nmajor=nmajor, nsigma=nsigma)
