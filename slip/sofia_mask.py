@@ -142,6 +142,32 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
         unique_ids = unique_ids[unique_ids > 0]  # Remove background (0)
         print(f"Found {len(unique_ids)} sources with IDs: {unique_ids}")
 
+        # if central_mask:
+            
+        #     Nz, Ny, Nx = mask_data.shape
+        #     centre = (Nz//2, Ny//2, Nx//2)
+        #     # radius = 5
+        #     # mask_data[0:(Nz//2)-radius,:,:] = 0
+        #     # mask_data[(Nz//2)+radius:,:,:] = 0
+        #     structure = np.ones((3,3,3), dtype=int)   # 26-connected neighbourhood
+        #     labels, n_islands = label(mask_data, structure=structure)
+
+        #     cz, cy, cx = centre
+        #     target_label = labels[cz, cy, cx]
+
+        #     if target_label == 0:
+        #         cz += 1
+        #         target_label = labels[cz, cy, cx]
+        #         if target_label == 0:
+        #             cz-=2
+        #             target_label = labels[cz, cy, cx]
+        #             if target_label == 0:
+        #                 raise ValueError("The centre voxel is not masked – check centre coordinates!")
+            
+        #     central_mask = (labels == target_label).astype(int)  # 1 = central object
+
+        #     mask_data = central_mask
+
         if central_mask:
             
             Nz, Ny, Nx = mask_data.shape
@@ -154,16 +180,41 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
 
             cz, cy, cx = centre
             target_label = labels[cz, cy, cx]
+            adjacent_channel_search = 5  # Number of adjacent channels to search for non-zero label Do NOT set to a value higher than 3!!!!!!!!
+            adjacent_radial_pixel_search = 2  # Number of adjacent radial pixels to search for non-zero label. Do NOT set to a value higher than 2!!!!!!!!
 
             if target_label == 0:
-                cz += 1
-                target_label = labels[cz, cy, cx]
-                if target_label == 0:
-                    cz-=2
-                    target_label = labels[cz, cy, cx]
-                    if target_label == 0:
-                        raise ValueError("The centre voxel is not masked – check centre coordinates!")
-            
+                found = False
+                for adj in range(1, adjacent_channel_search + 1):
+                    # Forward direction
+                    cz_try_forward = cz + adj
+                    region_forward = labels[
+                        cz_try_forward,
+                        cy - adjacent_radial_pixel_search : cy + adjacent_radial_pixel_search + 1,
+                        cx - adjacent_radial_pixel_search : cx + adjacent_radial_pixel_search + 1
+                    ]
+                    if np.any(region_forward != 0):
+                        cz = cz_try_forward
+                        found = True
+                        break
+
+                    # Backward direction
+                    cz_try_backward = cz - adj
+                    region_backward = labels[
+                        cz_try_backward,
+                        cy - adjacent_radial_pixel_search : cy + adjacent_radial_pixel_search + 1,
+                        cx - adjacent_radial_pixel_search : cx + adjacent_radial_pixel_search + 1
+                    ]
+                    if np.any(region_backward != 0):
+                        cz = cz_try_backward
+                        found = True
+                        break
+
+                if not found:
+                    raise ValueError("The centre voxel is not masked – check centre coordinates!")
+
+            target_label = labels[cz, cy, cx]
+        
             central_mask = (labels == target_label).astype(int)  # 1 = central object
 
             mask_data = central_mask
