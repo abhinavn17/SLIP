@@ -242,7 +242,6 @@ def main():
     if uvcontsub_flag:
         ms_uvsub = msfile.split('.ms')[0] + '_uvcontsub.ms'
         contchans = str(spw) + ':' + str(bchan) + '~' + str(bchan_line) + ';' + str(echan_line) + '~' + str(echan)
-        datacolumn = 'data'
 
         if not(os.path.exists(ms_uvsub)):
             print("Running UVCONTSUB")

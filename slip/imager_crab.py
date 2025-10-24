@@ -9,7 +9,7 @@ import casaviewer
 
 if __name__ == '__main__':
 
-    ms_uvsub, out_tclean, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width = sys.argv[1:]
+    ms_uvsub, out_tclean, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width, deconvolver, usemask, mask, nmajor = sys.argv[1:]
 
     timsize = [int(imsize), int(imsize)]
     niter = int(niter)
