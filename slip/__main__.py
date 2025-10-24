@@ -237,7 +237,7 @@ def main():
             t.putkeyword('UVSUB_DONE', True)
 
         t.close()
-        datacolumn = 'corrected_data'
+        datacolumn = 'corrected'
 
     if uvcontsub_flag:
         ms_uvsub = msfile.split('.ms')[0] + '_uvcontsub.ms'
