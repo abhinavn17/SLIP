@@ -115,7 +115,7 @@ def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, velt
 
     # Estimating max SNR 
     tname = out_tclean + '.image'
-    noise_stat = imstat(imagename=tname, chans='20')
+    noise_stat = imstat(imagename=tname, chans=str(int(imstat(imagename=tname)['maxpos'][3]*0.2)))
     rms = noise_stat['rms'][0]
     # noise_stats = imstat(imagename=tname)
     peak = noise_stat['max'][0]
@@ -132,6 +132,8 @@ def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, velt
 
     # Exporting as a fits file for SoFiA
     exportfits(imagename=out_tclean+'.image',fitsimage = out_tclean + '_image.fits', velocity=False, bitpix=-32, minpix=0,maxpix=-1, overwrite=True, dropstokes=False, stokeslast=True, history=True, dropdeg=False)
+    
+    exportfits(imagename=out_tclean+'.image',fitsimage = out_tclean + '_vel.fits', velocity=True, optical=True, bitpix=-32, minpix=0,maxpix=-1, overwrite=True, history=True, dropdeg=True)
 
     return out_tclean + '_image.fits'
 
@@ -237,7 +239,7 @@ def main():
             t.putkeyword('UVSUB_DONE', True)
 
         t.close()
-        datacolumn = 'corrected_data'
+        datacolumn = 'corrected'
 
     if uvcontsub_flag:
         ms_uvsub = msfile.split('.ms')[0] + '_uvcontsub.ms'
@@ -266,6 +268,7 @@ def main():
     field = par['field']
     width = par['width']
     spw_cube = str(spw) + ':' + str(bchan) + '~' + str(echan)
+    line_spw_cube = str(spw) + ':' + str(bchan_line) + '~' + str(echan_line)
     tcell = str(cell) + 'arcsec'
     deconvolver = par['deconvolver']
     if int(uvrange) > 0:
@@ -301,6 +304,59 @@ def main():
         out_tclean = name + '_cube_' + str(i+1)
 
         run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = niter, cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = deconvolver, usemask = 'user', mask = casa_mask, nproc = nproc, nmajor= -1)
+    
+    line_only_imaging = True
+    if line_only_imaging:
+        i = sofia_niter
+            
+        casa_mask = run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask)
+    
+        out_tclean = name + '_cube_' + str(i+1)
+    
+        run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = line_spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = niter, cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = deconvolver, usemask = 'user', mask = casa_mask, nproc = nproc, nmajor= -1)
+            
+        fitsimage = out_tclean + '_vel.fits'
+        filename = fitsimage.replace('_vel.fits','')
+    
+        os.environ['OMP_NUM_THREADS'] = f'{nproc}'
+    
+        with open(sofia_infile, "r") as f:
+            par_lines = f.readlines()
+    
+        new_lines = [ f"input.data = {fitsimage}\n" if line.startswith("input.data") else line for line in par_lines]
+    
+        new_lines = [f"scfind.threshold = {sofia_thresh}\n" if line.startswith("scfind.threshold") else line for line in new_lines]
+    
+        outdir = fitsimage.split('_image.fits')[0] + '_sofia_' + str(i+1)
+    
+        if os.path.exists(outdir):
+            os.system('rm -rf ' + outdir)
+        else:
+            os.system('mkdir ' + outdir)
+    
+        new_lines = [f"output.directory = {outdir}\n" if line.startswith("output.directory") else line for line in new_lines]
+        new_lines = [f"output.filename = {filename}\n" if line.startswith("output.filename") else line for line in new_lines]
+    
+        # Write to a temporary par file
+        with open(sofia_infile, "w") as temp_f:
+            temp_f.writelines(new_lines)
+        # Run SOFIA (replace 'sofia' with the actual command if needed)
+        subprocess.run(["sofia", sofia_infile])
+    	
+    	# Comment out following block if you do not require the last run's mask as a casa-compatible mask.
+        sofia_files = find_sofia_files(outdir)
+    
+        mask_file = sofia_files['mask']
+        mom0_file = sofia_files['mom0']
+    
+        binary_mask = name + '_cube_sofia_' + str(i+1) + '_mask.fits'
+    
+        # Convert mask
+        result = convert_sofia_mask_to_casa(
+            mask_file=mask_file,
+            mom0_file=mom0_file,
+            output_file=binary_mask,
+            central_mask=central_mask)
 
     # os.system('rm -rf test_sofia/')
     # os.system('mkdir test_sofia')
