@@ -180,8 +180,8 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
 
             cz, cy, cx = centre
             target_label = labels[cz, cy, cx]
-            adjacent_channel_search = 5  # Number of adjacent channels to search for non-zero label Do NOT set to a value higher than 3!!!!!!!!
-            adjacent_radial_pixel_search = 2  # Number of adjacent radial pixels to search for non-zero label. Do NOT set to a value higher than 2!!!!!!!!
+            adjacent_channel_search = 3  # Number of adjacent channels to search for non-zero label Do NOT set to a value higher than 3!!!!!!!!
+            adjacent_radial_pixel_search = 1  # Number of adjacent radial pixels to search for non-zero label. Do NOT set to a value higher than 2!!!!!!!!
 
             if target_label == 0:
                 found = False
