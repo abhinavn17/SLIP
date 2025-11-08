@@ -9,17 +9,28 @@ import argparse
 import subprocess
 from configparser import ConfigParser
 from .sofia_mask import convert_sofia_mask_to_casa, find_sofia_files
-
+from .chan_finder import find_channel_range
+from .cube_process import convert_cube
 
 def make_config_file():
 
     parser = argparse.ArgumentParser(description='Make a configuration file for SLIP')
     parser.add_argument('--config', '-c', default='slip.ini', help='Configuration file name')
     parser.add_argument('msfile', type=str, help='Measurement set file')
+    parser.add_argument('--vel', nargs = 2, type = str, default = ['optical', '0.0'], help='Velocity definition and central line velocity in km/s (e.g., optical 1000.0)')
+    parser.add_argument('--cutout', type=str, default=None, help='Cutout bandwidth around the found channel (e.g., 100km/s or 0.1MHz or 200 for 200 channels).')
+    parser.add_argument('--rest_freq', type=float, default=1420.40575178e6, help='Rest frequency in Hz (optional, default is HI 21cm line).')
     args = parser.parse_args()
 
     config = args.config
     msfile = args.msfile
+    vel = args.vel
+    vdef = vel[0]
+    velocity = float(vel[1])
+    cutout = args.cutout
+    rest_freq = args.rest_freq
+
+    bchan_in, echan_in, bchan_line_in, echan_line_in = find_channel_range(msfile, velocity, vdef, cutout, rest_freq)
 
     config = os.path.join(os.getcwd(), config)
 
@@ -43,6 +54,12 @@ def make_config_file():
 
     config_parser.set('DEFAULT', 'msfile', msfile)
 
+    config_parser.set('UVSUB', 'bchan', str(bchan_in))
+    config_parser.set('UVSUB', 'echan', str(echan_in))
+    config_parser.set('UVSUB', 'bchan_line', str(bchan_line_in))
+    config_parser.set('UVSUB', 'echan_line', str(echan_line_in))
+    config_parser.set('IMAGING', 'restfreq', (str(rest_freq)+'Hz'))
+
     with open(config, 'w') as configfile:
         config_parser.write(configfile)
 
@@ -65,7 +82,7 @@ def read_parameters(file_path):
     return parameters
 # ------------------------------
 
-def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width, deconvolver, usemask, mask, nproc, nmajor):
+def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, veltype, restfreq, tcell, tuvrange, tuvtaper, imsize, weighting, niter, cycleniter, nsigma, robust, width, deconvolver, usemask, mask, nproc, nmajor, smooth):
 
     cmd = 'rm -rf ' + out_tclean + '*'
     os.system(cmd)
@@ -132,12 +149,19 @@ def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, velt
 
     # Exporting as a fits file for SoFiA
     exportfits(imagename=out_tclean+'.image',fitsimage = out_tclean + '_image.fits', velocity=False, bitpix=-32, minpix=0,maxpix=-1, overwrite=True, dropstokes=False, stokeslast=True, history=True, dropdeg=False)
-    
-    exportfits(imagename=out_tclean+'.image',fitsimage = out_tclean + '_vel.fits', velocity=True, optical=True, bitpix=-32, minpix=0,maxpix=-1, overwrite=True, history=True, dropdeg=True)
 
+    convert_cube(
+        input_file=out_tclean + '.image',
+        rest_freq=restfreq,
+        convention=veltype,
+        specsys=outframe,
+        smooth=smooth,
+        direction='freq2vel'
+    )
+    
     return out_tclean + '_image.fits'
 
-def run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask):
+def run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent_channel_search, adjacent_radial_pixel_search):
 
     fitsimage = name + '_cube_' + str(i) + '_image.fits'
     filename = name + '_cube_' + str(i)
@@ -180,7 +204,9 @@ def run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask):
         mask_file=mask_file,
         mom0_file=mom0_file,
         output_file=binary_mask,
-        central_mask=central_mask)
+        central_mask=central_mask,
+        adjacent_channel_search=adjacent_channel_search,
+        adjacent_radial_pixel_search=adjacent_radial_pixel_search)
 
     casa_mask = name + '_cube_sofia_' + str(i+1) + '_mask.image'
 
@@ -284,13 +310,28 @@ def main():
     veltype = par['veltype']
     nproc = par['nproc']
 
+    do_smooth = par['do_smooth']
+    if do_smooth.lower() == 'true':
+        try:
+            bmaj = float(par['bmaj'])
+            bmin = float(par['bmin'])
+            bpa = float(par['bpa'])
+            smooth = bmaj, bmin, bpa
+        except:
+            print('Error in reading smoothing parameters. Check bmaj, bmin, bpa values in the parameter file.')
+            smooth = None
+    else:
+        smooth = None
+
     out_tclean = name + '_cube_0'
 
-    run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = '1000', cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = 'hogbom', usemask = 'pb', mask = '', nproc = nproc, nmajor = 0)
+    run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = '1000', cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = 'hogbom', usemask = 'pb', mask = '', nproc = nproc, nmajor = 0, smooth = smooth)
 
     sofia_niter = int(par['sofia_niter'])
     sofia_thresh = par['thresh']
     central_mask = par['centre_mask']
+    adjacent_channel_search = int(par['adjacent_channel_search'])
+    adjacent_radial_pixel_search = int(par['adjacent_radial_pixel_search'])
 
     if central_mask.lower() == 'true':
         central_mask = True
@@ -299,24 +340,33 @@ def main():
 
     for i in range(sofia_niter):
 
-        casa_mask = run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask)
+        casa_mask = run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent_channel_search, adjacent_radial_pixel_search)
 
         out_tclean = name + '_cube_' + str(i+1)
 
-        run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = niter, cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = deconvolver, usemask = 'user', mask = casa_mask, nproc = nproc, nmajor= -1)
+        run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = niter, cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = deconvolver, usemask = 'user', mask = casa_mask, nproc = nproc, nmajor= -1, smooth = smooth)
     
     line_only_imaging = True
     if line_only_imaging:
         i = sofia_niter
             
-        casa_mask = run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask)
+        casa_mask = run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent_channel_search, adjacent_radial_pixel_search)
     
         out_tclean = name + '_cube_' + str(i+1)
     
-        run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = line_spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = niter, cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = deconvolver, usemask = 'user', mask = casa_mask, nproc = nproc, nmajor= -1)
-            
-        fitsimage = out_tclean + '_vel.fits'
-        filename = fitsimage.replace('_vel.fits','')
+        run_tclean(out_tclean = out_tclean, ms_uvsub = ms_uvsub, field = field, datacolumn = datacolumn, spw_cube = line_spw_cube, outframe = outframe, veltype = veltype, restfreq = restfreq, tcell = tcell, tuvrange = tuvrange, tuvtaper = tuvtaper, imsize = imsize, weighting = weighting, niter = niter, cycleniter = cycleniter, nsigma = nsigma, robust = robust, width = width, deconvolver = deconvolver, usemask = 'user', mask = casa_mask, nproc = nproc, nmajor= -1, smooth = smooth)
+
+        base = out_tclean + '.image'
+        if smooth:
+            base += '_smooth'
+        
+        if veltype == 'optical':
+            fitsimage = base + '_vopt.fits'
+        else:
+            fitsimage = base + '_vrad.fits'
+
+        # fitsimage = out_tclean + '_image.fits'
+        filename = out_tclean
     
         os.environ['OMP_NUM_THREADS'] = f'{nproc}'
     
@@ -327,7 +377,7 @@ def main():
     
         new_lines = [f"scfind.threshold = {sofia_thresh}\n" if line.startswith("scfind.threshold") else line for line in new_lines]
     
-        outdir = fitsimage.split('_image.fits')[0] + '_sofia_' + str(i+1)
+        outdir = fitsimage.split('.fits')[0] + '_sofia_' + str(i+1)
     
         if os.path.exists(outdir):
             os.system('rm -rf ' + outdir)
@@ -344,19 +394,21 @@ def main():
         subprocess.run(["sofia", sofia_infile])
     	
     	# Comment out following block if you do not require the last run's mask as a casa-compatible mask.
-        sofia_files = find_sofia_files(outdir)
+        # sofia_files = find_sofia_files(outdir)
     
-        mask_file = sofia_files['mask']
-        mom0_file = sofia_files['mom0']
+        # mask_file = sofia_files['mask']
+        # mom0_file = sofia_files['mom0']
     
-        binary_mask = name + '_cube_sofia_' + str(i+1) + '_mask.fits'
+        # binary_mask = name + '_cube_sofia_' + str(i+1) + '_mask.fits'
     
-        # Convert mask
-        result = convert_sofia_mask_to_casa(
-            mask_file=mask_file,
-            mom0_file=mom0_file,
-            output_file=binary_mask,
-            central_mask=central_mask)
+        # # Convert mask
+        # result = convert_sofia_mask_to_casa(
+        #     mask_file=mask_file,
+        #     mom0_file=mom0_file,
+        #     output_file=binary_mask,
+        #     central_mask=central_mask,
+        #     adjacent_channel_search=adjacent_channel_search,
+        #     adjacent_radial_pixel_search=adjacent_radial_pixel_search)
 
     # os.system('rm -rf test_sofia/')
     # os.system('mkdir test_sofia')
@@ -376,3 +428,4 @@ def main():
 if __name__ == '__main__':
 
     main()
+

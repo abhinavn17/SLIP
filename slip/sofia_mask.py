@@ -102,8 +102,10 @@ def extract_beam_from_mom0(mom0_file):
     
     return beam_params
 
-def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=True,
-                              binary_threshold=0, source_ids=None):
+def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=True, 
+                               adjacent_channel_search = 3,
+                               adjacent_radial_pixel_search = 1,
+                               binary_threshold=0, source_ids=None):
     """
     Convert SoFiA mask to CASA-compatible binary mask.
     
@@ -119,6 +121,14 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
         Threshold for creating binary mask (0 = any non-zero value)
     source_ids : list, optional
         List of specific source IDs to include in mask
+    central_mask : bool
+        If True, only keep the central source in the mask.
+    adjacent_channel_search : int
+        Number of adjacent channels to search for non-zero label when identifying central source.
+        Try to keep this value low (e.g., 1-3) to avoid excessive searching and false tagging.
+    adjacent_radial_pixel_search : int
+        Number of adjacent radial pixels to search for non-zero label when identifying central source.
+        Try to keep this value low (e.g., 1-2) to avoid excessive searching and false tagging.
     """
     
     print(f"Converting SoFiA mask: {mask_file}")
@@ -178,10 +188,11 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
             structure = np.ones((3,3,3), dtype=int)   # 26-connected neighbourhood
             labels, n_islands = label(mask_data, structure=structure)
 
+            adjacent_channel_search = int(float(adjacent_channel_search))
+            adjacent_radial_pixel_search = int(float(adjacent_radial_pixel_search))
+
             cz, cy, cx = centre
             target_label = labels[cz, cy, cx]
-            adjacent_channel_search = 3  # Number of adjacent channels to search for non-zero label Do NOT set to a value higher than 3!!!!!!!!
-            adjacent_radial_pixel_search = 1  # Number of adjacent radial pixels to search for non-zero label. Do NOT set to a value higher than 2!!!!!!!!
 
             if target_label == 0:
                 found = False
@@ -404,3 +415,4 @@ def main():
 
 if __name__ == '__main__':
     main()
+
