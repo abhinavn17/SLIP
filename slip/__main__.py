@@ -132,10 +132,13 @@ def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, velt
 
     # Estimating max SNR 
     tname = out_tclean + '.image'
-    noise_stat = imstat(imagename=tname, chans=str(int(imstat(imagename=tname)['maxpos'][3]*0.2)))
-    rms = noise_stat['rms'][0]
-    # noise_stats = imstat(imagename=tname)
-    peak = noise_stat['max'][0]
+    im_stat = imstat(imagename=tname)
+    peak = im_stat['max'][0]
+    for chan in range(int(im_stat['trc'][3]*0.1), int(im_stat['trc'][3]*0.4)):
+        noise_stat = imstat(imagename=tname, chans=str(chan))
+        rms = noise_stat['rms'][0]
+        if rms > 0:
+            break
     snr = peak/rms
     print('+++++++++++++++++++++++++')
     print('+++++++++++++++++++++++++')
