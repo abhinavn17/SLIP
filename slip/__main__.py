@@ -17,9 +17,9 @@ def make_config_file():
     parser = argparse.ArgumentParser(description='Make a configuration file for SLIP')
     parser.add_argument('--config', '-c', default='slip.ini', help='Configuration file name')
     parser.add_argument('msfile', type=str, help='Measurement set file')
-    parser.add_argument('--vel', nargs = 2, type = str, default = ['optical', '0.0'], help='Velocity definition and central line velocity in km/s (e.g., optical 1000.0)')
-    parser.add_argument('--cutout', type=str, default=None, help='Cutout bandwidth around the found channel (e.g., 100km/s or 0.1MHz or 200 for 200 channels).')
-    parser.add_argument('--rest_freq', type=float, default=1420.40575178e6, help='Rest frequency in Hz (optional, default is HI 21cm line).')
+    parser.add_argument('--vel', '-v', nargs = 2, type = str, default = ['optical', '0.0'], help='Velocity definition and central line velocity in km/s (e.g., optical 1000.0)')
+    parser.add_argument('--cutout', '-ct', type=str, default=None, help='Cutout bandwidth around the found channel (e.g., 100km/s or 0.1MHz or 200 for 200 channels).')
+    parser.add_argument('--rest_freq', '-rf', type=float, default=1420.40575178e6, help='Rest frequency in Hz (optional, default is HI 21cm line).')
     args = parser.parse_args()
 
     config = args.config
