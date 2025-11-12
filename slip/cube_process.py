@@ -45,7 +45,7 @@ def specsys_correction(specsys):
         return specsys.upper()
 
 def parse_freq_string(freq_str):
-    freq_str = freq_str.lower().strip()
+    freq_str = str(freq_str).lower().strip()
     try:
         if freq_str.endswith(('hz', 'khz', 'mhz', 'ghz')):
             if freq_str.endswith('ghz'):
@@ -344,10 +344,10 @@ def main():
     parser = argparse.ArgumentParser(
         description='Convert FITS cubes between frequency and velocity',
         epilog='Examples:\n'
-               '  python freq2vel.py cube.fits                          # Auto-detect and convert\n'
-               '  python freq2vel.py cube.fits --direction freq2vel     # Force freq to vel\n'
-               '  python freq2vel.py cube.fits --direction vel2freq     # Force vel to freq\n'
-               '  python freq2vel.py cube.fits --smooth 15.0 15.0 0.0   # Convert with smoothing\n',
+               '  python cube_process.py cube.fits                          # Auto-detect and convert\n'
+               '  python cube_process.py cube.fits --direction freq2vel     # Force freq to vel\n'
+               '  python cube_process.py cube.fits --convention optical     # Use optical definition of velocity\n'
+               '  python cube_process.py cube.fits --smooth 15.0 15.0 0.0   # Convert with smoothing\n',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
     

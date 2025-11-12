@@ -108,15 +108,16 @@ def main():
     )
 
     parser.add_argument("msfile", help="Path to the input Measurement Set (*.ms).")
-    parser.add_argument("velocity", type=float, help="Target velocity in km/s.")
+    # parser.add_argument("-v","--velocity", type=float, help="Target velocity in km/s.")
+    parser.add_argument("-v","--velocity", nargs = 2, type = str, default = ['optical', '0.0'], help='Velocity definition and central line velocity in km/s (e.g., optical 1000.0)')
 
-    parser.add_argument(
-        "-d", "--definition", choices=["optical", "opt", "radio", "rad", "relativistic", "rel"],
-        default="optical", help="Velocity convention opt[ical]/rad[io]/rel[ativistic] (default: optical)."
-    )
+    # parser.add_argument(
+    #     "-d", "--definition", choices=["optical", "opt", "radio", "rad", "relativistic", "rel"],
+    #     default="optical", help="Velocity convention opt[ical]/rad[io]/rel[ativistic] (default: optical)."
+    # )
     parser.add_argument(
         "-c", "--cutout", type=str, default=None,
-        help="Cutout bandwidth around the found channel (e.g., 100km/s or 0.1MHz)."
+        help="Cutout bandwidth around the found channel (e.g., 100km/s or 0.1MHz). \nTotal bandwidth of the output will be double this value (e.g. 200km/s or 0.2MHz)"
     )
 
     # Frequency shortcuts
@@ -130,156 +131,13 @@ def main():
     group.add_argument('--rest-freq', type=float, help='Custom rest frequency in Hz.')
 
     args = parser.parse_args()
+    vel = args.velocity
+    vdef = vel[0]
+    velocity = float(vel[1].strip())
 
     rest_freq = args.rest_freq if args.rest_freq else DEFAULT_RESTFREQ
 
-    find_channel_range(args.msfile, args.velocity, args.definition, args.cutout, rest_freq)
-
-    # # Open Measurement Set and read spectral window info
-    # data_table = table(args.msfile + '/SPECTRAL_WINDOW', readonly=True)
-    # nfreq = data_table.getcol('CHAN_FREQ')
-    # nchan = int(data_table.getcol('NUM_CHAN')[0])
-    # data_table.close()
-
-    # freqbeg, freqend = nfreq[0][0], nfreq[-1][0]
-    # freqq = np.linspace(freqbeg, freqend, nchan)
-    # chan_width = np.abs(np.diff(freqq).mean())
-
-    # velocc = compute_velocity(freqq, rest_freq, args.definition)
-    # chan_no = np.argmin(np.abs(velocc - args.velocity))
-    # found_vel = velocc[chan_no]
-    # found_freq = freqq[chan_no]
-
-    # print(f"Channel number corresponding to {args.velocity} km/s "
-    #       f"({args.definition} definition): {chan_no}")
-    # print(f"Found velocity at this channel: {found_vel:.4f} km/s")
-    # print(f"Found frequency at this channel: {found_freq/1e6:.6f} MHz")
-
-    # cutout = args.cutout
-    # if cutout:
-    #     try:
-    #         chan_offset = parse_cutout_input(cutout, velocc, chan_width)
-    #         cutout_range = (max(0, chan_no - chan_offset),
-    #                         min(nchan - 1, chan_no + chan_offset - 1))
-    #         print(f"Cutout channel range: {cutout_range[0]}–{cutout_range[1]}")
-    #     except ValueError as e:
-    #         print(f"Error: {e}")
-    #         sys.exit(1)
-    #         return (0, nchan - 1, cutout_range[0], cutout_range[1])
-    # else:
-    #     print("No cutout selected.")
-    #     return (0, nchan - 1, None, None)
-
+    find_channel_range(args.msfile, velocity, vdef, args.cutout, rest_freq)
 
 if __name__ == "__main__":
     main()
-
-
-# OLDER VERSION BELOW
-#!usr/bin/env python
-
-# import os
-# import sys
-# import numpy as np
-# from casatools import table
-
-
-# # if convention == 'optical':
-# #     # Optical convention: v = c * (λ - λ0) / λ0 = c * (f0 - f) / f
-# #     velocity = c_kms * (rest_freq - freq) / freq
-# # elif convention == 'radio':
-# #     # Radio convention: v = c * (f0 - f) / f0
-# #     velocity = c_kms * (rest_freq - freq) / rest_freq
-# # elif convention == 'relativistic':
-# #     # Relativistic convention: v = c * ((f0/f)^2 - 1) / ((f0/f)^2 + 1)
-# #     ratio = rest_freq / freq
-# #     velocity = c_kms * (ratio**2 - 1) / (ratio**2 + 1)
-# # else:
-# #     raise ValueError("Convention must be 'optical', 'radio', or 'relativistic'")
-    
-
-# c = 299792.458 # km/s
-# restfreqq = 1420.40575178e6
-
-# if len(sys.argv) != 4:
-#     print("Usage: python chan_finder_corrected.py <msfile> <convention> <velocity_km/s>")
-#     print("convention: 'optical', 'radio', or 'relativistic'")
-#     sys.exit(1)
-
-# msfile = sys.argv[1]
-# convention = sys.argv[2]  # 'optical', 'radio', or 'relativistic'
-# vel_to_find = float(sys.argv[3])  # in km/s
-
-# listfname = msfile.replace('.ms','.txt')
-# # tb = table(msfile, readonly=True)
-# data_table = table(msfile + '/SPECTRAL_WINDOW', readonly=True)
-
-
-# nfreq = data_table.getcol('CHAN_FREQ')
-
-# freqbeg = nfreq[0][0]
-# freqend = nfreq[-1][0]
-
-# nchan = data_table.getcol('NUM_CHAN')
-# nchan = int(nchan[0])
-
-# data_table.close()
-
-# freqq = np.linspace(freqbeg, freqend, nchan)
-# chan_width = np.abs(np.diff(freqq).mean())
-# band_width = nchan * chan_width
-# velocc_opt = c * ((restfreqq - freqq) / freqq)
-# velocc_rad = c * ((restfreqq - freqq) / restfreqq)
-# velocc_rel = c * ((((restfreqq / freqq) ** 2) - 1) / (((restfreqq / freqq) ** 2) + 1))
-
-# if convention.lower() in ['optical', 'opt']:
-#     velocc = velocc_opt
-# elif convention.lower() in ['radio', 'rad']:
-#     velocc = velocc_rad
-# elif convention.lower() in ['relativistic', 'rel']:
-#     velocc = velocc_rel
-# else:
-#     raise ValueError("Convention must be 'optical', 'radio', or 'relativistic'")
-
-# chan_no = np.argmin(np.abs(velocc - vel_to_find))
-# found_vel = velocc[chan_no]
-# found_freq = freqq[chan_no]
-# print(f"Channel number corresponding to {vel_to_find} km/s w/ ({convention} convention): {chan_no}")
-# print(f"Found velocity at this channel: {found_vel} km/s")
-# print(f"Found frequency at this channel: {found_freq/1e6} MHz")
-
-# cutout = input("Do you wish to select a cutout bandwidth around this channel? (y/n): ")
-# if cutout.lower() in ['y', 'yes']:
-#     cut_width = input("Enter cutout range with units (e.g., 100km/s or 0.1MHz): ")
-#     if cut_width.lower().endswith('m/s') or cut_width.lower().endswith('ms'):
-#         if cut_width.lower().endswith('km/s'):
-#             cut_width_value = float(cut_width[:-4])
-#         elif cut_width.lower().endswith('m/s'):
-#             cut_width_value = float(cut_width[:-3]) / 1000.0
-#         elif cut_width.lower().endswith('kms'):
-#             cut_width_value = float(cut_width[:-3])
-#         elif cut_width.lower.endswith('ms'):
-#             cut_width_value = float(cut_width[:-2]) / 1000.0
-#         else:
-#             print("Invalid velocity unit. Use km/s or m/s.")
-#             sys.exit(1)
-#         chan_offset = int(np.ceil(cut_width_value / np.abs(np.diff(velocc).mean())))
-#     elif cut_width.lower().endswith('hz'):
-#         if cut_width.lower().endswith('ghz'):
-#             cut_width_value = float(cut_width[:-3]) * 1e9
-#         elif cut_width.lower().endswith('mhz'):
-#             cut_width_value = float(cut_width[:-3]) * 1e6
-#         elif cut_width.lower().endswith('khz'):
-#             cut_width_value = float(cut_width[:-3]) * 1e3
-#         elif cut_width.lower().endswith('hz'):
-#             cut_width_value = float(cut_width[:-2])
-#         else:
-#             print("Invalid frequency unit. Use GHz, MHz, kHz, or Hz.")
-#             sys.exit(1)
-#         chan_offset = int(np.ceil(cut_width_value / chan_width))
-#     cutout_range = (max(0, chan_no - chan_offset), min(nchan - 1, (chan_no + chan_offset - 1)))
-#     print(f"Cutout channel range: {cutout_range[0]}~{cutout_range[1]}")
-# else:
-#     print("No cutout selected.")
-
-
