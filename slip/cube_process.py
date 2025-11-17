@@ -13,33 +13,41 @@ from spectral_cube import SpectralCube
 from radio_beam import Beam
 from astropy.convolution import Gaussian2DKernel
 
+# Default HI rest frequency (Hz)
+DEFAULT_RESTFREQ = 1420.40575178e6
+
+# Default pattern for parsing through during batch conversion
+DEFAULT_PATTERN = ['*.fits', '*.image']
+
+
+SPECSYS_MAP = {
+    'TOPO': 'TOPOCENT',
+    'LSRK': 'LSRK',
+    'LSRD': 'LSRD',
+    'BARY': 'BARYCENT',
+    'GALACTO': 'GALACTOC',
+    'HELIOCENT': 'HELIOCEN',
+    'GEO': 'GEOCENTR',
+    'CMB': 'CMBDIPOL',
+    'LGROUP': 'LOCALGRP',
+    'REST': 'SOURCE',
+    'TOPOCENT': 'TOPOCENT',
+    'BARYCENT': 'BARYCENT',
+    'GEOCENTR': 'GEOCENTR',
+    'HELIOCEN': 'HELIOCEN',
+    'GALACTOC': 'GALACTOC',
+    'LOCALGRP': 'LOCALGRP',
+    'CMBDIPOL': 'CMBDIPOL',
+    'SOURCE': 'SOURCE'
+}
+    
+
 def specsys_correction(specsys):
     """
     Map CASA outframe specsys names to standard FITS-compatible names
     """
-    specsys_map = {
-        'TOPO': 'TOPOCENT',
-        'LSRK': 'LSRK',
-        'LSRD': 'LSRD',
-        'BARY': 'BARYCENT',
-        'GALACTO': 'GALACTOC',
-        'HELIOCENT': 'HELIOCEN',
-        'GEO': 'GEOCENTR',
-        'CMB': 'CMBDIPOL',
-        'LGROUP': 'LOCALGRP',
-        'REST': 'SOURCE',
-        'TOPOCENT': 'TOPOCENT',
-        'BARYCENT': 'BARYCENT',
-        'GEOCENTR': 'GEOCENTR',
-        'HELIOCEN': 'HELIOCEN',
-        'GALACTOC': 'GALACTOC',
-        'LOCALGRP': 'LOCALGRP',
-        'CMBDIPOL': 'CMBDIPOL',
-        'SOURCE': 'SOURCE'
-    }
-    
-    if specsys.upper() in specsys_map:
-        return specsys_map[specsys.upper()]
+    if specsys.upper() in SPECSYS_MAP:
+        return SPECSYS_MAP[specsys.upper()]
     else:
         warnings.warn(f"Unknown SPECSYS '{specsys}', using as-is.")
         return specsys.upper()
@@ -300,25 +308,27 @@ def convert_cube(input_file,
 
 def batch_convert_directory(input_dir, rest_freq=1420.40575178e6,
                            convention='radio', specsys='TOPOCENT',
-                           pattern='*.fits', smooth=None, direction='auto'):
+                           pattern=['*.fits', '*.image'], smooth=None, direction='auto'):
     """
     Convert all FITS files in a directory between frequency and velocity
     """
     import glob
     
-    fits_files = glob.glob(os.path.join(input_dir, pattern))
-    
-    if not fits_files:
-        print(f"No FITS files found in {input_dir}")
+    in_files = []
+    for p in pattern:
+        in_files.extend(glob.glob(os.path.join(input_dir, p)))
+
+    if not in_files:
+        print(f"No relevant image (FITS or CASA) files found in {input_dir}")
         return
     
-    print(f"Found {len(fits_files)} FITS files to convert")
+    print(f"Found {len(in_files)} image files to convert")
     
     converted_files = []
     failed_files = []
     
-    for i, input_file in enumerate(fits_files, 1):
-        print(f"\n[{i}/{len(fits_files)}] Processing: {os.path.basename(input_file)}")
+    for i, input_file in enumerate(in_files, 1):
+        print(f"\n[{i}/{len(in_files)}] Processing: {os.path.basename(input_file)}")
         try:
             output_file = convert_cube(input_file,
                                        rest_freq=rest_freq,
@@ -342,61 +352,78 @@ def batch_convert_directory(input_dir, rest_freq=1420.40575178e6,
 
 def main():
     parser = argparse.ArgumentParser(
-        description='Convert FITS cubes between frequency and velocity',
+        description='Convert FITS/CASA image cubes between frequency and velocity and Export as FITS files',
         epilog='Examples:\n'
-               '  python cube_process.py cube.fits                          # Auto-detect and convert\n'
-               '  python cube_process.py cube.fits --direction freq2vel     # Force freq to vel\n'
-               '  python cube_process.py cube.fits --convention optical     # Use optical definition of velocity\n'
-               '  python cube_process.py cube.fits --smooth 15.0 15.0 0.0   # Convert with smoothing\n',
+               '  python cube_process.py cube.fits                                       # Auto-detect and convert\n'
+               '  python cube_process.py cube.image --direction freq2vel                 # Force freq to vel\n'
+               '  python cube_process.py cube.fits --convention optical                  # Use optical definition of velocity\n'
+               '  python cube_process.py cube.image --smooth 15.0 15.0 0.0               # Convert with smoothing\n'
+               '  python cube_process.py --batch --fitsonly data_/data/image_dir         # Batch convert only .FITS files in directory\n',
         formatter_class=argparse.RawDescriptionHelpFormatter
     )
-    
-    parser.add_argument('input', help='Input FITS file or directory')
+
+
+    parser.add_argument('input', help='Input FITS/CASA image file or directory (for batch mode)')
     parser.add_argument('-d', '--direction', choices=['auto', 'freq2vel', 'vel2freq'],
                        default='auto', 
                        help='Conversion direction (default: auto-detect)')
-    parser.add_argument('-r', '--rest-freq', type=float, default=1420.40575178e6,
-                       help='Rest frequency in Hz (default: HI 21cm)')
     parser.add_argument('-c', '--convention', choices=['optical', 'radio', 'relativistic'],
                        default='radio', 
                        help='Velocity convention for freq2vel (default: radio)')
-    parser.add_argument('-s', '--specsys', default='BARYCENT',
+    parser.add_argument('-s', '--specsys', default='BARYCENT', choices=np.sort(list(SPECSYS_MAP.keys())),
                        help='Spectral reference frame (default: BARYCENT)')
-    parser.add_argument('--batch', action='store_true',
-                       help='Process all FITS files in input directory')
-    parser.add_argument('--pattern', default='*.fits',
-                       help='File pattern for batch processing (default: *.fits)')
-    
-    # Add common rest frequencies as shortcuts
-    parser.add_argument('--hi', action='store_const', dest='rest_freq',
-                       const=1420.40575178e6, help='Use HI 21cm rest frequency')
-    parser.add_argument('--oh1665', action='store_const', dest='rest_freq',
-                       const=1665.4018e6, help='Use OH 1665 MHz rest frequency')
-    parser.add_argument('--oh1667', action='store_const', dest='rest_freq',
-                       const=1667.3590e6, help='Use OH 1667 MHz rest frequency')
     parser.add_argument('--smooth', nargs=3, type=float, default=None, 
                        metavar=('BMAJ', 'BMIN', 'BPA'),
-                       help='Smoothing kernel: bmaj bmin (arcsec) and PA (deg)')
+                       help='Smoothing kernel: bmaj bmin (arcsec) and PA (deg) (default: no smoothing)')
     
+    parser.add_argument('--batch', action='store_true',
+                       help='Process all FITS/CASA image files in input directory')
+    
+    # Batch file pattern shortcuts
+    group_pattern = parser.add_mutually_exclusive_group()
+    group_pattern.add_argument('--all', action='store_const', dest='pattern',
+                       const=['*.fits', '*.image'], help='Use Both .FITS and .image files (For batch mode).')
+    group_pattern.add_argument('--fitsonly', action='store_const', dest='pattern',
+                       const=['*.fits'], help='Use Only .FITS files (For batch mode).')
+    group_pattern.add_argument('--imageonly', action='store_const', dest='pattern',
+                       const=['*.image'], help='Use Only .image files (For batch mode).')
+    
+    # Frequency shortcuts
+    group_freq = parser.add_mutually_exclusive_group()
+    group_freq.add_argument('--hi', action='store_const', dest='rest_freq',
+                       const=1420.40575178e6, help='Use HI 21cm rest frequency (1420.40575178 MHz). <-- default')
+    group_freq.add_argument('--oh1665', action='store_const', dest='rest_freq',
+                       const=1665.4018e6, help='Use OH 1665 MHz rest frequency.')
+    group_freq.add_argument('--oh1667', action='store_const', dest='rest_freq',
+                       const=1667.3590e6, help='Use OH 1667 MHz rest frequency.')
+    group_freq.add_argument('--rest-freq', type=float, help='Custom rest frequency in Hz.')
+
+
     args = parser.parse_args()
     
-    if args.batch or os.path.isdir(args.input):
+    rest_freq = args.rest_freq if args.rest_freq else DEFAULT_RESTFREQ
+    pattern = args.pattern if args.pattern else DEFAULT_PATTERN
+
+    input, convention, direction, specsys, smooth = args.input, args.convention, args.direction, args.specsys, args.smooth
+
+    # if args.batch or os.path.isdir(args.input):
+    if args.batch:
         # Batch processing
-        batch_convert_directory(args.input,
-                              rest_freq=args.rest_freq,
-                              convention=args.convention,
-                              specsys=args.specsys,
-                              pattern=args.pattern,
-                              smooth=args.smooth,
-                              direction=args.direction)
+        batch_convert_directory(input,
+                              rest_freq=rest_freq,
+                              convention=convention,
+                              specsys=specsys,
+                              pattern=pattern,
+                              smooth=smooth,
+                              direction=direction)
     else:
         # Single file processing
-        convert_cube(args.input,
-                    rest_freq=args.rest_freq,
-                    convention=args.convention,
-                    specsys=args.specsys,
-                    smooth=args.smooth,
-                    direction=args.direction)
+        convert_cube(input,
+                    rest_freq=rest_freq,
+                    convention=convention,
+                    specsys=specsys,
+                    smooth=smooth,
+                    direction=direction)
 
 if __name__ == "__main__":
     main()
