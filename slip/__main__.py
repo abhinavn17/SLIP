@@ -3,7 +3,7 @@ To image spectral cube.
 '''
 import os
 import sys
-from casatasks import uvcontsub, imstat, exportfits, uvsub, importfits
+from casatasks import uvcontsub, imstat, exportfits, uvsub, importfits, flagdata
 from casatools import table
 import argparse
 import subprocess
@@ -239,7 +239,9 @@ def main():
     spw = par['spw']
     fitorder = int(par['fit_order'])
     uvsub_flag = par['do_uvsub']
+    do_rflag_on_uvsub = par['do_rflag_on_uvsub']
     uvcontsub_flag = par['do_uvcontsub']
+    do_rflag_on_uvcontsub = par['do_rflag_on_uvcontsub']
 
     if uvsub_flag.lower() == 'true':
         uvsub_flag = True
@@ -266,6 +268,10 @@ def main():
             print('Running UVSUB')
             uvsub(vis=msfile)
             t.putkeyword('UVSUB_DONE', True)
+            if do_rflag_on_uvsub.lower() == 'true':
+                print('Running RFLAG on UVSUB data with following parameters:')
+                print(f'  winsize = 3, timedevscale = 5.0, freqdevscale = 5.0, and extendflags = True')
+                flagdata(vis=msfile, mode='rflag', datacolumn='corrected', winsize=3, timedevscale=5.0,freqdevscale=5.0, extendflags=True, action='apply')
 
         t.close()
         datacolumn = 'corrected'
@@ -278,7 +284,13 @@ def main():
             print("Running UVCONTSUB")
             
             uvcontsub(vis=msfile, outputvis=ms_uvsub, spw = str(spw), datacolumn = datacolumn, fitspec=contchans, fitorder=fitorder, field='0')
-            datacolumn = 'data'
+            if do_rflag_on_uvcontsub.lower() == 'true':
+                print('Running RFLAG on UVCONTSUB data with following parameters:')
+                print(f'  winsize = 3, timedevscale = 5.0, freqdevscale = 5.0, and extendflags = True')
+                flagdata(vis=ms_uvsub, mode='rflag', datacolumn='data', winsize=3, timedevscale=5.0,freqdevscale=5.0, extendflags=True, action='apply')
+                datacolumn = 'corrected'
+            else:
+                datacolumn = 'data'
         else:
             print('UVCONTSUB file exist. Not doing uvcontsub.')
         # ------------------------------
