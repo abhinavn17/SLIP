@@ -105,6 +105,7 @@ def extract_beam_from_mom0(mom0_file):
 def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=True, 
                                adjacent_channel_search = 3,
                                adjacent_radial_pixel_search = 1,
+                               bchan_line_mask = None, echan_line_mask = None,
                                binary_threshold=0, source_ids=None):
     """
     Convert SoFiA mask to CASA-compatible binary mask.
@@ -129,6 +130,10 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
     adjacent_radial_pixel_search : int
         Number of adjacent radial pixels to search for non-zero label when identifying central source.
         Try to keep this value low (e.g., 1-2) to avoid excessive searching and false tagging.
+    bchan_line_mask, echan_line_mask : int
+        If central_mask == True,
+        Masked central Pixel will be searched from the midpoint of the line beginning channel to line ending channel 
+        expanding outwards in both directions within (midpoint_channel ± adjacent_channel_search) range.
     """
     
     print(f"Converting SoFiA mask: {mask_file}")
@@ -179,22 +184,36 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
         #     mask_data = central_mask
 
         if central_mask:
-            
+            adjacent_channel_search = int(float(adjacent_channel_search))
+            adjacent_radial_pixel_search = int(float(adjacent_radial_pixel_search))
+
             Nz, Ny, Nx = mask_data.shape
-            centre = (Nz//2, Ny//2, Nx//2)
+            # centre = (Nz // 2, Ny//2, Nx//2)
+            if bchan_line_mask is not None:
+                z_1_start = bchan_line_mask - 1
+            else:
+                z_1_start = 0
+            if echan_line_mask is not None:
+                z_2_end = echan_line_mask + 1
+            else:
+                z_2_end = mask_data.shape[0]
+            
+            Nz = z_2_end - z_1_start
+
+            centre = ((z_1_start + (Nz // 2)), Ny//2, Nx//2)
+
+            print(f"Centre voxel of selected masked region is at: {centre}")
             # radius = 5
             # mask_data[0:(Nz//2)-radius,:,:] = 0
             # mask_data[(Nz//2)+radius:,:,:] = 0
             structure = np.ones((3,3,3), dtype=int)   # 26-connected neighbourhood
             labels, n_islands = label(mask_data, structure=structure)
 
-            adjacent_channel_search = int(float(adjacent_channel_search))
-            adjacent_radial_pixel_search = int(float(adjacent_radial_pixel_search))
-
             cz, cy, cx = centre
             target_label = labels[cz, cy, cx]
 
             if target_label == 0:
+                print(f"Line mask will be checked in channels from {centre[0] - adjacent_channel_search} to {centre[0] + adjacent_channel_search} starting from {centre[0]} expanding out.")
                 found = False
                 for adj in range(1, adjacent_channel_search + 1):
                     # Forward direction
@@ -205,7 +224,10 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
                         cx - adjacent_radial_pixel_search : cx + adjacent_radial_pixel_search + 1
                     ]
                     if np.any(region_forward != 0):
+                        rel_yx = np.argwhere(region_forward != 0)[0]
                         cz = cz_try_forward
+                        cy = (cy - adjacent_radial_pixel_search) + rel_yx[0]
+                        cx = (cx - adjacent_radial_pixel_search) + rel_yx[1]
                         found = True
                         break
 
@@ -217,14 +239,18 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
                         cx - adjacent_radial_pixel_search : cx + adjacent_radial_pixel_search + 1
                     ]
                     if np.any(region_backward != 0):
+                        rel_yx = np.argwhere(region_backward != 0)[0]
                         cz = cz_try_backward
+                        cy = (cy - adjacent_radial_pixel_search) + rel_yx[0]
+                        cx = (cx - adjacent_radial_pixel_search) + rel_yx[1]
                         found = True
                         break
 
                 if not found:
-                    raise ValueError("The centre voxel is not masked – check centre coordinates!")
+                    raise ValueError(f"The centre voxel at {centre} is not masked – check centre coordinates!")
 
             target_label = labels[cz, cy, cx]
+            print(f"Nearest masked voxel found at: (z={cz}, y={cy}, x={cx})")
         
             central_mask = (labels == target_label).astype(int)  # 1 = central object
 
