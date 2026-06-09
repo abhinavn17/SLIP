@@ -7,7 +7,7 @@ with open('requirements.txt') as f:
 
 setup(
     name='SLIP',  
-    version='2.1.5',  
+    version='2.1.6',  
     author='Abhinav Narayan',
     description='Spectral Line Imaging Pipeline for GMRT and uGMRT data',
     long_description=open('README.md').read(),

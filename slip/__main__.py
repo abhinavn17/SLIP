@@ -247,6 +247,16 @@ def main():
     uvcontsub_flag = par['do_uvcontsub']
     do_rflag_on_uvcontsub = par['do_rflag_on_uvcontsub']
 
+    try:
+        bchan_line = int(bchan_line)
+    except (TypeError, ValueError):
+        bchan_line = int(bchan)
+    try:
+        echan_line = int(echan_line)
+    except (TypeError, ValueError):
+        echan_line = int(echan)
+
+
     if uvsub_flag.lower() == 'true':
         uvsub_flag = True
     else:
@@ -357,8 +367,14 @@ def main():
     else:
         central_mask = False
 
-    bchan_line_mask = int(bchan_line)
-    echan_line_mask = int(echan_line)
+    try:
+        bchan_line_mask = int(bchan_line)
+    except (TypeError, ValueError):
+        bchan_line_mask = int(bchan)
+    try:
+        echan_line_mask = int(echan_line)
+    except (TypeError, ValueError):
+        echan_line_mask = int(echan)
 
     for i in range(sofia_niter):
 
