@@ -166,7 +166,7 @@ def run_tclean(out_tclean, ms_uvsub, field, datacolumn, spw_cube, outframe, velt
     
     return out_tclean + '_image.fits'
 
-def run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent_channel_search, adjacent_radial_pixel_search, bchan_line_mask, echan_line_mask):
+def run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent_channel_search, adjacent_radial_pixel_search, bchan_line_mask, echan_line_mask, width):
 
     fitsimage = name + '_cube_' + str(i) + '_image.fits'
     filename = name + '_cube_' + str(i)
@@ -213,7 +213,8 @@ def run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent
         adjacent_channel_search=adjacent_channel_search,
         adjacent_radial_pixel_search=adjacent_radial_pixel_search,
         bchan_line_mask=bchan_line_mask,
-        echan_line_mask=echan_line_mask)
+        echan_line_mask=echan_line_mask,
+        width=width)
 
     casa_mask = name + '_cube_sofia_' + str(i+1) + '_mask.image'
 
@@ -378,7 +379,7 @@ def main():
 
     for i in range(sofia_niter):
 
-        casa_mask = run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent_channel_search, adjacent_radial_pixel_search, bchan_line_mask, echan_line_mask)
+        casa_mask = run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent_channel_search, adjacent_radial_pixel_search, bchan_line_mask, echan_line_mask, width)
 
         out_tclean = name + '_cube_' + str(i+1)
 
@@ -388,7 +389,7 @@ def main():
     if line_only_imaging:
         i = sofia_niter
             
-        casa_mask = run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent_channel_search, adjacent_radial_pixel_search, bchan_line_mask, echan_line_mask)
+        casa_mask = run_sofia(sofia_infile, sofia_thresh, name, i, nproc, central_mask, adjacent_channel_search, adjacent_radial_pixel_search, bchan_line_mask, echan_line_mask, width)
     
         out_tclean = name + '_cube_' + str(i+1)
     

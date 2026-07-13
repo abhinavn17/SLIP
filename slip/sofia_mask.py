@@ -105,7 +105,7 @@ def extract_beam_from_mom0(mom0_file):
 def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=True, 
                                adjacent_channel_search = 3,
                                adjacent_radial_pixel_search = 1,
-                               bchan_line_mask = None, echan_line_mask = None,
+                               bchan_line_mask = None, echan_line_mask = None, width=None,
                                binary_threshold=0, source_ids=None):
     """
     Convert SoFiA mask to CASA-compatible binary mask.
@@ -134,6 +134,8 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
         If central_mask == True,
         Masked central Pixel will be searched from the midpoint of the line beginning channel to line ending channel 
         expanding outwards in both directions within (midpoint_channel ± adjacent_channel_search) range.
+    width : int
+        Based on image width the central Pixel will be estimated.
     """
     
     print(f"Converting SoFiA mask: {mask_file}")
@@ -187,22 +189,57 @@ def convert_sofia_mask_to_casa(mask_file, mom0_file, output_file, central_mask=T
             adjacent_channel_search = int(float(adjacent_channel_search))
             adjacent_radial_pixel_search = int(float(adjacent_radial_pixel_search))
 
-            Nz, Ny, Nx = mask_data.shape
-            # centre = (Nz // 2, Ny//2, Nx//2)
+            Nz_mask, Ny, Nx = mask_data.shape
+
+            try:
+                width_val = int(width)
+                if width_val <= 0:
+                    width_val = 1
+            except (TypeError, ValueError):
+                width_val = 1
+
             if bchan_line_mask is not None:
-                z_1_start = bchan_line_mask - 1
+                # Map to image space and ensure it is not less than 0
+                z_1_start = max(0, bchan_line_mask // width_val)
             else:
                 z_1_start = 0
+                
             if echan_line_mask is not None:
-                z_2_end = echan_line_mask + 1
+                # Map to image space and clamp to the maximum available channels in the mask
+                z_2_end = min(Nz_mask - 1, echan_line_mask // width_val)
             else:
-                z_2_end = mask_data.shape[0]
+                z_2_end = Nz_mask - 1
             
-            Nz = z_2_end - z_1_start
+            # Calculate the number of channels in the selected sub-region of the cube
+            Nz_selected = (z_2_end - z_1_start) + 1
+            
+            # The central channel voxel relative to the absolute mask array index
+            centre_z = z_1_start + (Nz_selected // 2)
+            
+            # Final safety check to prevent edge cases from pushing the center out of bounds
+            centre_z = min(max(0, centre_z), Nz_mask - 1)
 
-            centre = ((z_1_start + (Nz // 2)), Ny//2, Nx//2)
+            centre = (centre_z, Ny // 2, Nx // 2)
 
             print(f"Centre voxel of selected masked region is at: {centre}")
+
+            # # centre = (Nz // 2, Ny//2, Nx//2)
+            # if bchan_line_mask is not None:
+            #     z_1_start = bchan_line_mask - 1
+            # else:
+            #     z_1_start = 0
+            # if echan_line_mask is not None:
+            #     z_2_end = echan_line_mask + 1
+            # else:
+            #     z_2_end = mask_data.shape[0]
+            
+            # Nz = z_2_end - z_1_start
+
+            # centre = ((z_1_start + (Nz // 2)), Ny//2, Nx//2)
+
+            # print(f"Centre voxel of selected masked region is at: {centre}")
+
+            
             # radius = 5
             # mask_data[0:(Nz//2)-radius,:,:] = 0
             # mask_data[(Nz//2)+radius:,:,:] = 0
