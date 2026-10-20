@@ -243,6 +243,7 @@ def main():
     echan_line = par['echan_line']
     spw = par['spw']
     fitorder = int(par['fit_order'])
+    prep_do_rflag = par['prep_do_rflag_on_ms']
     uvsub_flag = par['do_uvsub']
     do_rflag_on_uvsub = par['do_rflag_on_uvsub']
     uvcontsub_flag = par['do_uvcontsub']
@@ -270,8 +271,15 @@ def main():
 
     # Performing uvsub
     msfile = par['msfile']
-    datacolumn = 'data'
     ms_uvsub = msfile
+
+    if prep_do_rflag.lower() == 'true':
+        print('Running RFLAG on MSFILE data with following parameters:')
+        print(f'  winsize = 3, timedevscale = 5.0, freqdevscale = 5.0, and extendflags = True')
+        flagdata(vis=ms_uvsub, mode='rflag', datacolumn='data', winsize=3, timedevscale=5.0,freqdevscale=5.0, extendflags=True, action='apply')
+        datacolumn = 'corrected'
+    else:
+        datacolumn = 'data'
 
     if uvsub_flag:
         t = table(msfile, readonly=False)
@@ -279,6 +287,13 @@ def main():
 
         if uvsub_done:
             print('UVSUB already done. Not doing uvsub again.')
+            # if do_rflag_on_uvsub.lower() == 'true':
+            #     print("!!!!! WARNING: We're running rflag on previously UV-subtracted file !!!!")
+            #     print("!!!!!   WARNING: Make sure you have elected the right option here   !!!!")
+            #     print('Running RFLAG on UVSUB data with following parameters:')
+            #     print(f'  winsize = 3, timedevscale = 5.0, freqdevscale = 5.0, and extendflags = True')
+            #     flagdata(vis=msfile, mode='rflag', datacolumn='corrected', winsize=3, timedevscale=5.0,freqdevscale=5.0, extendflags=True, action='apply')
+
         else:
             print('Running UVSUB')
             uvsub(vis=msfile)
@@ -307,7 +322,14 @@ def main():
             else:
                 datacolumn = 'data'
         else:
-            print('UVCONTSUB file exist. Not doing uvcontsub.')
+            print('UVCONTSUB file exists. Not doing uvcontsub.')
+            if do_rflag_on_uvcontsub.lower() == 'true':
+                print('Running RFLAG on UVCONTSUB data with following parameters:')
+                print(f'  winsize = 3, timedevscale = 5.0, freqdevscale = 5.0, and extendflags = True')
+                flagdata(vis=ms_uvsub, mode='rflag', datacolumn='data', winsize=3, timedevscale=5.0,freqdevscale=5.0, extendflags=True, action='apply')
+                datacolumn = 'corrected'
+            else:
+                datacolumn = 'data'            
         # ------------------------------
 
     # Performing line imaging
