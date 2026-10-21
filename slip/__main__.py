@@ -243,11 +243,11 @@ def main():
     echan_line = par['echan_line']
     spw = par['spw']
     fitorder = int(par['fit_order'])
-    prep_do_rflag = par['prep_do_rflag_on_ms']
-    uvsub_flag = par['do_uvsub']
-    do_rflag_on_uvsub = par['do_rflag_on_uvsub']
-    uvcontsub_flag = par['do_uvcontsub']
-    do_rflag_on_uvcontsub = par['do_rflag_on_uvcontsub']
+    prep_do_rflag = par['prep_do_rflag_on_ms'] if 'prep_do_rflag_on_ms' in par else "False"
+    uvsub_flag = par['do_uvsub'] if 'do_uvsub' in par else "False"
+    do_rflag_on_uvsub = par['do_rflag_on_uvsub'] if 'do_rflag_on_uvsub' in par else "False"
+    uvcontsub_flag = par['do_uvcontsub'] if 'do_uvcontsub' in par else "False"
+    do_rflag_on_uvcontsub = par['do_rflag_on_uvcontsub'] if 'do_rflag_on_uvcontsub' in par else "False"
 
     try:
         bchan_line = int(bchan_line)
